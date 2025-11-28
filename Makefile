@@ -1,4 +1,3 @@
-# 完整的 Makefile
 PREFIX = arm-none-eabi-
 CC = $(PREFIX)gcc
 AS = $(PREFIX)gcc
@@ -8,15 +7,30 @@ SIZE = $(PREFIX)size
 TARGET = stm32f103c8t6
 MCU = cortex-m3
 
-CFLAGS = -mcpu=$(MCU) -mthumb -mlittle-endian -Os -g
-CFLAGS += -ffunction-sections -fdata-sections
-CFLAGS += -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER
-CFLAGS += -Wall -Wextra
+CFLAGS = -mcpu=cortex-m3 -mthumb -mlittle-endian -Os -g \
+         -ffunction-sections -fdata-sections \
+         -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER \
+         -Wall -Wextra \
+         -Icommon -Idevice -Idrivers -ICMSIS
 
 LDFLAGS = -Tstartup/$(TARGET).ld -nostartfiles
 LDFLAGS += -Wl,--gc-sections -specs=nano.specs -specs=nosys.specs
 
-INCLUDES = -Iuser/inc -Iinc -Istartup -Idrivers/STM32F10x_StdPeriph_Driver/inc
+# 精确指定需要编译的源文件，排除有问题的文件
+STARTUP_SRCS = $(filter-out startup/core_cm3.c, $(wildcard startup/*.c))  # 排除 core_cm3.c
+DRIVER_SRCS = $(wildcard drivers/*.c)
+DEVICE_SRCS = $(wildcard device/*.c)
+USER_SRCS = $(wildcard user/*.c)
+
+ASM_SRCS = $(wildcard startup/*.s)
+# 合并所有源文件
+C_SOURCES =$(STARTUP_SRCS) $(DRIVER_SRCS) $(DEVICE_SRCS) $(USER_SRCS)
+ASM_SOURCES = $(ASM_SRCS)
+
+# 生成目标文件列表（保持文件名）
+OBJS = $(addprefix build/,$(notdir $(C_SOURCES:.c=.o) $(ASM_SOURCES:.s=.o)))
+
+INCLUDES = -Iuser -Idevice -Istartup -Idrivers -Icommon	
 
 ELF = build/$(TARGET).elf
 BIN = build/$(TARGET).bin
@@ -27,39 +41,31 @@ $(BIN): $(ELF)
 	@echo "生成二进制文件..."
 	$(OBJCOPY) -O binary $< $@
 
-$(ELF): build/main.o build/stm32f10x_it.o build/Delay.o build/system.o build/startup.o build/gpio.o build/rcc.o
+$(ELF): $(OBJS)
 	@echo "链接目标文件..."
-	@mkdir -p build
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 	$(SIZE) $@
 
-build/main.o: user/main.c
+# 编译规则 - 每个目录单独处理
+build/%.o: user/%.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-build/stm32f10x_it.o: src/stm32f10x_it.c
+build/%.o: device/%.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-build/Delay.o: src/Delay.c
+build/%.o: startup/%.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-build/system.o: startup/system_stm32f10x.c
+build/%.o: drivers/%.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-build/startup.o: startup/startup_stm32f10x.s
+build/%.o: startup/%.s
 	@mkdir -p build
 	$(AS) -mcpu=$(MCU) -mthumb -c -o $@ $<
-
-build/gpio.o: drivers/STM32F10x_StdPeriph_Driver/src/stm32f10x_gpio.c
-	@mkdir -p build
-	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
-
-build/rcc.o: drivers/STM32F10x_StdPeriph_Driver/src/stm32f10x_rcc.c
-	@mkdir -p build
-	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 clean:
 	@echo "清理构建文件..."
