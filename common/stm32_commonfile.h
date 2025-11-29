@@ -1,7 +1,7 @@
 #ifndef __STM32_COMMONFILE_H
 #define __STM32_COMMONFILE_H
 
-#include "stm32f10x.h"       // STM32标准库头文件   
+#include "stm32f10x.h" 
 #include "misc.h"        
 #include "stm32f10x_adc.h"
 #include "stm32f10x_bkp.h"
@@ -27,8 +27,12 @@
 #include "stm32f10x_usart.h"
 #include "stm32f10x_wwdg.h"
 
+//===================================================用户自定义文件===================================================
 
 #include "Delay.h"  
+#include "PWM.h"
+
+//===================================================用户自定义文件===================================================
 
 
 #endif
